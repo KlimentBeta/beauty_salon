@@ -1,12 +1,6 @@
 import mysql.connector
 from mysql.connector import Error
-
-# ── Константы подключения ───────────────────────
-DB_HOST = "localhost"
-DB_PORT = 3306
-DB_NAME = "beauty_salon"
-DB_USER = "kali"
-DB_PASSWORD = "Kali@2025!"
+from config import DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD
 
 
 def get_connection():
