@@ -1,10 +1,9 @@
 import sys
-from PyQt6.QtWidgets import QApplication, QLabel, QWidget
+from PyQt6.QtWidgets import QApplication, QWidget
 
 app = QApplication(sys.argv)
 win = QWidget()
-win.setWindowTitle("Hello")
-label = QLabel("Hello World", win)
+win.setWindowTitle("Beauty salon")
 win.resize(1200, 800)
 win.show()
 sys.exit(app.exec())

@@ -2,7 +2,6 @@ import mysql.connector
 from mysql.connector import Error
 from config import DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD
 
-
 def get_connection():
     try:
         connection = mysql.connector.connect(
@@ -23,15 +22,9 @@ class Database():
     def __init__(self):
         self.conn = get_connection()
 
+
     
     def fetch_all(self, table_name: str):
-        if not self.conn or not self.conn.is_connected():
-            print("⚠️ Нет подключения к БД")
-            return []
-
-        if not table_name.replace('_', '').isalnum():
-            raise ValueError(f"Недопустимое имя таблицы: {table_name}")
-
         try:
             cursor = self.conn.cursor(dictionary=True)
             cursor.execute(f"SELECT * FROM `{table_name}`")
@@ -41,3 +34,29 @@ class Database():
         except Error as e:
             print(f"❌ Ошибка запроса к таблице '{table_name}': {e}")
             return []
+    
+    def initialize_table(self, table_name: str, data: list):
+        try:
+            cursor = self.conn.cursor()
+
+            cursor.execute(f"DELETE FROM `{table_name}`")
+            print(f"🧹 Таблица '{table_name}' очищена")
+
+            
+            columns = list(data[0].keys())
+            placeholders = ', '.join(['%s'] * len(columns))
+            columns_str = ', '.join([f"`{col}`" for col in columns])
+
+            sql = f"INSERT INTO `{table_name}` ({columns_str}) VALUES ({placeholders})"
+            values = [[item[col] for col in columns] for item in data]
+
+            cursor.executemany(sql, values)
+            self.conn.commit()
+
+            print(f"✅ В таблицу '{table_name}' добавлено {cursor.rowcount} записей")
+            cursor.close()
+
+            return True
+        except Error as e:
+            print(f"❌ Ошибка запроса к таблице '{table_name}': {e}")
+            return False
