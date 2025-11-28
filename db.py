@@ -21,19 +21,6 @@ def get_connection():
 class Database():
     def __init__(self):
         self.conn = get_connection()
-
-
-    
-    def fetch_all(self, table_name: str):
-        try:
-            cursor = self.conn.cursor(dictionary=True)
-            cursor.execute(f"SELECT * FROM `{table_name}`")
-            result = cursor.fetchall()
-            cursor.close()
-            return result
-        except Error as e:
-            print(f"❌ Ошибка запроса к таблице '{table_name}': {e}")
-            return []
     
     def initialize_table(self, table_name: str, data: list):
         try:
@@ -104,3 +91,13 @@ class Database():
             print(f"❌ Ошибка запроса к таблице '{table_name}': {e}")
             return None
         
+    def fetch_all(self, table_name: str):
+        try:
+            cursor = self.conn.cursor(dictionary=True)
+            cursor.execute(f"SELECT * FROM `{table_name}`")
+            result = cursor.fetchall()
+            cursor.close()
+            return result
+        except Error as e:
+            print(f"❌ Ошибка запроса к таблице '{table_name}': {e}")
+            return []
