@@ -60,3 +60,47 @@ class Database():
         except Error as e:
             print(f"❌ Ошибка запроса к таблице '{table_name}': {e}")
             return False
+
+    def get_service_id(self, service):
+        try:
+            table_name = 'Service'
+            cursor = self.conn.cursor()
+
+            service_clean = service.strip()
+    
+            sql = f"SELECT ID FROM {table_name} WHERE TRIM(Title) = %s LIMIT 1"
+            cursor.execute(sql, (service_clean,))
+
+            result = cursor.fetchone()
+            cursor.close()
+
+            if result:
+                return result[0] 
+            else:
+                return None
+        except Error as e:
+            print(f"❌ Ошибка запроса к таблице '{table_name}': {e}")
+            return None
+        
+
+    def get_client_id(self, client):
+        try:
+            table_name = 'Client'
+            cursor = self.conn.cursor()
+
+            lastname_clean = client.strip()
+    
+            sql = f"SELECT ID FROM {table_name} WHERE TRIM(LastName) = %s LIMIT 1"
+            cursor.execute(sql, (lastname_clean,))
+
+            result = cursor.fetchone()
+            cursor.close()
+
+            if result:
+                return result[0] 
+            else:
+                return None
+        except Error as e:
+            print(f"❌ Ошибка запроса к таблице '{table_name}': {e}")
+            return None
+        
