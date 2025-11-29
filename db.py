@@ -101,3 +101,26 @@ class Database():
         except Error as e:
             print(f"❌ Ошибка запроса к таблице '{table_name}': {e}")
             return []
+        
+    def delete_service(self, service_id):
+        try:
+            cursor = self.conn.cursor()
+            cursor.execute("DELETE FROM Service WHERE id = %s", (service_id,))
+            self.conn.commit()  # Обязательно подтверждаем транзакцию
+            deleted_rows = cursor.rowcount
+            cursor.close()
+            return deleted_rows > 0  # True, если хотя бы одна строка удалена
+        except Error as e:
+            print(f"❌ Ошибка при удалении из таблицы Service: {e}")
+            return False
+
+    def fetch_one(self, arg):
+        try:
+            cursor = self.conn.cursor(dictionary=True)
+            cursor.execute(arg)
+            result = cursor.fetchall()
+            cursor.close()
+            return result
+        except Error as e:
+            print(f"❌ Ошибка запроса к таблице: {e}")
+            return []
