@@ -1,9 +1,9 @@
 # main.py
-import sys
+import sys, os
 from typing import Optional
 from PyQt6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QScrollArea, QFrame,
-    QPushButton, QHBoxLayout, QLabel, QDialog, QComboBox, QLineEdit
+    QPushButton, QHBoxLayout, QLabel, QDialog, QComboBox, QLineEdit, QDoubleSpinBox, QSpinBox, QTextEdit, QMessageBox, QFileDialog
 )
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont, QPixmap
@@ -186,6 +186,26 @@ class MainWindow(QWidget):
 
         main_layout.addLayout(control_layout)
 
+                # === Кнопка "Ближайшие записи" (только для админа) ===
+        self.near_service_btn = QPushButton("Ближайшие записи")
+        self.near_service_btn.setFont(QFont(FONT_FAMILY, 12, QFont.Weight.Bold))
+        self.near_service_btn.setFixedHeight(44)
+        self.near_service_btn.setStyleSheet(f"""
+    QPushButton {{
+background-color: {rgb_to_hex((74, 20, 140))};
+        color: white;
+        border: none;
+        border-radius: 12px;
+        padding: 0 24px;
+    }}
+    QPushButton:hover {{
+background-color: {rgb_to_hex((74, 20, 120))};
+    }}
+""")
+        self.near_service_btn.clicked.connect(self.on_nearly_service)
+        self.near_service_btn.setVisible(self.is_admin)  # скрыть по умолчанию
+        main_layout.addWidget(self.near_service_btn)
+
         # === Кнопка "Добавить услугу" (только для админа) ===
         self.add_service_btn = QPushButton("➕ Добавить новую услугу")
         self.add_service_btn.setFont(QFont(FONT_FAMILY, 12, QFont.Weight.Bold))
@@ -303,6 +323,7 @@ class MainWindow(QWidget):
         for card in self.service_cards:
             card.set_admin_mode(True)
         self.add_service_btn.setVisible(True)
+        self.near_service_btn.setVisible(True)
     
     def on_edit(self, service_id: int):
         print(f"[Admin] Редактирование услуги ID: {service_id}")
@@ -312,8 +333,144 @@ class MainWindow(QWidget):
         # res = db.delete_service(service_id)
         # print(res)
 
-    def on_add_service(self, service_id: int):
+    def on_nearly_service(self, service_id: int):
+        print(f"[Admin] Ближайшие записи")
+
+    def on_add_service(self):
         print(f"[Admin] Добавить услугу")
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Добавить новую услугу")
+        dialog.setModal(True)
+        dialog.setMinimumWidth(500)
+
+        layout = QVBoxLayout(dialog)
+
+        # Поля ввода
+        title_edit = QLineEdit()
+        cost_edit = QDoubleSpinBox()
+        cost_edit.setRange(0, 1_000_000)
+        cost_edit.setDecimals(2)
+        duration_edit = QSpinBox()
+        duration_edit.setRange(0, 24 * 3600)  # до 24 часов в секундах
+        desc_edit = QTextEdit()
+        discount_edit = QDoubleSpinBox()
+        discount_edit.setRange(0, 100)
+        discount_edit.setSuffix(" %")
+        discount_edit.setDecimals(1)
+        image_path_edit = QLineEdit()
+        image_path_edit.setReadOnly(True)
+        browse_btn = QPushButton("Выбрать изображение...")
+
+        # Макеты для строк
+        def add_row(label_text, widget):
+            row = QHBoxLayout()
+            row.addWidget(QLabel(label_text))
+            row.addWidget(widget, 1)
+            layout.addLayout(row)
+
+        add_row("Название*", title_edit)
+        add_row("Стоимость*", cost_edit)
+        add_row("Длительность, сек*", duration_edit)
+        layout.addWidget(QLabel("Описание"))
+        layout.addWidget(desc_edit)
+        add_row("Скидка (%)", discount_edit)
+
+        image_row = QHBoxLayout()
+        image_row.addWidget(QLabel("Основное изображение"))
+        image_row.addWidget(image_path_edit, 1)
+        image_row.addWidget(browse_btn)
+        layout.addLayout(image_row)
+
+        # Кнопки
+        btns = QHBoxLayout()
+        save_btn = QPushButton("Сохранить")
+        cancel_btn = QPushButton("Отмена")
+        btns.addWidget(save_btn)
+        btns.addWidget(cancel_btn)
+        layout.addLayout(btns)
+
+        # Обработчик выбора изображения
+        def on_browse():
+            file_path, _ = QFileDialog.getOpenFileName(
+                dialog,
+                "Выберите изображение",
+                "",
+                "Images (*.png *.jpg *.jpeg *.bmp *.webp)"
+            )
+            if file_path:
+                # Можно сразу копировать в assets/ и сохранять относительный путь — здесь просто путь
+                image_path_edit.setText(file_path)
+
+        browse_btn.clicked.connect(on_browse)
+
+        # Обработчик сохранения
+        def on_save():
+            title = title_edit.text().strip()
+            cost = cost_edit.value()
+            duration = duration_edit.value()
+            description = desc_edit.toPlainText().strip() or None
+            discount = discount_edit.value() or None
+            image_path = image_path_edit.text().strip() or None
+
+            # Валидация обязательных полей
+            errors = []
+            if not title:
+                errors.append("Название не может быть пустым")
+            if len(title) > 100:
+                errors.append("Название не должно превышать 100 символов")
+            if cost <= 0:
+                errors.append("Стоимость должна быть положительной")
+            if duration <= 0:
+                errors.append("Длительность должна быть положительной")
+
+            if errors:
+                QMessageBox.warning(dialog, "Ошибка ввода", "\n".join(errors))
+                return
+
+            # ⚠️ Опционально: копирование файла в assets и получение относительного пути
+            # Например: 'assets/services/logo123.jpg'
+            final_image_path = None
+            if image_path and os.path.isfile(image_path):
+                try:
+                    # Генерируем уникальное имя файла или используем title
+                    from pathlib import Path
+                    filename = f"{Path(title).stem}_{hash(image_path) % 10000}.jpg"
+                    dest_dir = "assets/services"
+                    os.makedirs(dest_dir, exist_ok=True)
+                    dest_path = os.path.join(dest_dir, filename)
+
+                    # Копируем (можно сжать/конвертировать при желании)
+                    from shutil import copy2
+                    copy2(image_path, dest_path)
+
+                    final_image_path = dest_path.replace("\\", "/")  # для кросс-платформенности
+                except Exception as e:
+                    QMessageBox.critical(dialog, "Ошибка", f"Не удалось сохранить изображение:\n{e}")
+                    return
+
+            # Вызов db.add_service — ожидаем сигнатуру:
+            try:
+                service_id_new = db.add_service(
+                    Title=title,
+                    Cost=cost,
+                    DurationInSeconds=duration,
+                    Description=description,
+                    Discount=1 - discount / 100 if discount is not None else None,  
+                    MainImagePath=final_image_path
+                )
+                if service_id_new:
+                    QMessageBox.information(dialog, "Успех", f"Услуга '{title}' добавлена")
+                    dialog.accept()
+                    self.services = db.fetch_all("Service")
+                else:
+                    QMessageBox.critical(dialog, "Ошибка", "Не удалось добавить услугу в базу данных.")
+            except Exception as e:
+                QMessageBox.critical(dialog, "Исключение", f"Ошибка при добавлении услуги:\n{e}")
+
+        save_btn.clicked.connect(on_save)
+        cancel_btn.clicked.connect(dialog.reject)
+
+        dialog.exec()
 
     def on_search_changed(self, text: str):
         self.search_query = text

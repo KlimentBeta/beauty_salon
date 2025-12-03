@@ -124,3 +124,51 @@ class Database():
         except Error as e:
             print(f"❌ Ошибка запроса к таблице: {e}")
             return []
+        
+    def add_service(self, Title: str, Cost: float, DurationInSeconds: int,
+                Description: str = None, Discount: float = None, MainImagePath: str = None) -> bool:
+     """
+     Добавляет новую услугу в таблицу Service.
+     Возвращает ID новой записи при успехе, иначе False (но по вашему стилю — лучше bool).
+     Однако, судя по предпочтению — возвращаем bool, как в delete_service.
+     """
+     try:
+         cursor = self.conn.cursor()
+    
+         # Проверка на длину Title и MainImagePath (на всякий, т.к. БД может не проверить клиентски)
+         if len(Title) > 100:
+             print("❌ Title превышает 100 символов")
+             return False
+         if MainImagePath and len(MainImagePath) > 1000:
+             print("❌ MainImagePath превышает 1000 символов")
+             return False
+    
+         query = """
+             INSERT INTO Service (Title, Cost, DurationInSeconds, Description, Discount, MainImagePath)
+             VALUES (%s, %s, %s, %s, %s, %s)
+         """
+         cursor.execute(query, (
+             Title,
+             Cost,
+             DurationInSeconds,
+             Description,
+             Discount,        # Передаём как есть: если 0.15 = 15%, то вызывающий код должен сам делить
+             MainImagePath
+         ))
+    
+         self.conn.commit()
+         inserted_id = cursor.lastrowid  # ID новой записи
+         cursor.close()
+    
+         # Вы можете вернуть inserted_id (int), но по вашему стилю — bool:
+         # return inserted_id is not None
+         return True
+    
+     except Exception as e:
+         print(f"❌ Ошибка при добавлении услуги в таблицу Service: {e}")
+         # Откатываем транзакцию при ошибке (если autocommit=False)
+         try:
+             self.conn.rollback()
+         except:
+             pass
+         return False

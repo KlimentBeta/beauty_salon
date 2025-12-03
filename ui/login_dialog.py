@@ -16,7 +16,7 @@ class LoginDialog(QDialog):
         layout.setSpacing(16)
         layout.setContentsMargins(24, 24, 24, 24)
 
-        title = QLabel("🔐 Введите PIN-код администратора")
+        title = QLabel("🔐 Введите PIN-код")
         title.setFont(QFont(FONT_FAMILY, 14, QFont.Weight.Bold))
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(title)
