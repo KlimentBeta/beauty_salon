@@ -3,3 +3,5 @@ __pycache__/
 reference/
 ui/__pycache__/
 utils/ui/__pycache__/
+ui/utils/__pycache__/
+ui/dialogs/__pycache__/
