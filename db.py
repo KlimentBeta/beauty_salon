@@ -102,17 +102,30 @@ class Database():
             print(f"❌ Ошибка запроса к таблице '{table_name}': {e}")
             return []
         
-    def delete_service(self, service_id):
+    def delete_service(self, service_id: int):
         try:
+            # Попытка удалить напрямую — если есть FK, будет исключение
             cursor = self.conn.cursor()
-            cursor.execute("DELETE FROM Service WHERE id = %s", (service_id,))
-            self.conn.commit()  # Обязательно подтверждаем транзакцию
-            deleted_rows = cursor.rowcount
+            cursor.execute("DELETE FROM Service WHERE ID = %s", (service_id,))
+            self.conn.commit()
             cursor.close()
-            return deleted_rows > 0  # True, если хотя бы одна строка удалена
+            return True, "Услуга успешно удалена."
+
         except Error as e:
-            print(f"❌ Ошибка при удалении из таблицы Service: {e}")
-            return False
+            self.conn.rollback()  # откатываем, если что-то пошло не так
+            err_msg = str(e)
+
+            # Обработка известных ошибок
+            if "1451" in err_msg or "foreign key constraint fails" in err_msg:
+                return False, "Невозможно удалить: услуга уже назначена клиентам."
+            elif "1062" in err_msg:  # дубликат — не актуально для DELETE, но для примера
+                return False, "Ошибка: нарушение уникальности."
+            else:
+                return False, f"Ошибка БД: {err_msg[:100]}..."  # обрезаем длинные сообщения
+
+        except Exception as e:
+            self.conn.rollback()
+            return False, f"Внутренняя ошибка: {str(e)}"
 
     def fetch_one(self, arg):
         try:
@@ -124,7 +137,20 @@ class Database():
         except Error as e:
             print(f"❌ Ошибка запроса к таблице: {e}")
             return []
-        
+
+    def execute(self, query, params=None):  # ← params=None делает аргумент необязательным
+        try:
+            cursor = self.conn.cursor(dictionary=True)
+            cursor.execute(query, params or ())  # ← если params=None → подставляем пустой кортеж
+            if cursor.rowcount >= 0:
+                self.conn.commit()
+            cursor.close()
+            return True
+        except Error as e:
+            print(f"❌ Ошибка запроса к таблице: {e}")
+            self.conn.rollback()
+            return False
+
     def add_service(self, Title: str, Cost: float, DurationInSeconds: int,
                 Description: str = None, Discount: float = None, MainImagePath: str = None) -> bool:
      """

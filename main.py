@@ -10,6 +10,8 @@ from PyQt6.QtGui import QFont, QPixmap
 from config import (
     COLOR_BUTTON_ADMIN, LOGO_PATH, FONT_FAMILY, COLOR_SECONDARY, COLOR_ATTENTION, rgb_to_hex
 )
+from ui.book_service_dialog import BookServiceDialog
+from ui.edit_service_dialog import EditServiceDialog
 from ui.service_card import ServiceCard
 from ui.login_dialog import LoginDialog
 from ui.utils.sort_services import sort_services_by_cost, filter_services_by_discount, DISCOUNT_RANGES, search_services
@@ -22,6 +24,11 @@ class MainWindow(QWidget):
         super().__init__()
         self.setWindowTitle("Beauty Salon")
         self.resize(1200, 800)
+
+        self.original_central_widget = None  # или self.original_layout
+        self.near_view_widget = None         # текущий "ближайший" UI
+        self.is_near_view = False
+
         self.is_admin = False
         self.service_cards = []  
 
@@ -81,8 +88,22 @@ class MainWindow(QWidget):
 
         # === Панель управления: сортировка + фильтр ===
                 
+        # control_layout = QHBoxLayout()
+        # control_layout.setContentsMargins(30, 10, 30, 10)
+        # === Панель управления: сортировка + фильтр ===
+        # === Панель управления: сортировка + фильтр ===
+        control_layout = QHBoxLayout()
+        # ... настройка ...
+        self.control_layout_widget = QFrame()
+        self.control_layout_widget.setFixedHeight(60)
+        self.control_layout_widget.setStyleSheet("background: transparent;")
         control_layout = QHBoxLayout()
         control_layout.setContentsMargins(30, 10, 30, 10)
+        # ... (всё как было: search_label, search_input, discount_combo и т.д.) ...
+        self.control_layout_widget.setLayout(control_layout)
+        main_layout.addWidget(self.control_layout_widget)
+
+        
 
         # === Поле поиска ===
         search_label = QLabel("🔍 Поиск:")
@@ -229,6 +250,8 @@ background-color: {rgb_to_hex((74, 20, 120))};
         
         # Scroll
         scroll = QScrollArea()
+        self.scroll_area = scroll
+        
         scroll.setWidgetResizable(True)
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         scroll.setStyleSheet("QScrollArea { border: none; background: transparent; }")
@@ -243,7 +266,7 @@ background-color: {rgb_to_hex((74, 20, 120))};
         self.service_cards.clear()
         for srv in self.services:
             # Расчёт скидки в %
-            discount_factor = float(srv.get('Discount', 1.0))
+            discount_factor = float(srv.get('Discount') or 1.0)
             discount_percent = 0
             if discount_factor < 1.0:
                 discount_percent = int((1 - discount_factor) * 100)
@@ -270,6 +293,7 @@ background-color: {rgb_to_hex((74, 20, 120))};
                 is_admin_mode=self.is_admin
             )
             card.edit_requested.connect(self.on_edit)
+            card.book_requested.connect(self.on_book)
             card.delete_requested.connect(self.on_delete)
             container_layout.addWidget(card)
             self.service_cards.append(card)
@@ -282,6 +306,7 @@ background-color: {rgb_to_hex((74, 20, 120))};
 
         # === Строка статуса внизу ===
         footer = QFrame()
+        self.footer = footer
         footer.setFixedHeight(40)
         footer.setStyleSheet(f"background-color: {rgb_to_hex((240, 242, 250))}; border-top: 1px solid {rgb_to_hex(COLOR_SECONDARY)};")
         footer_layout = QHBoxLayout()
@@ -300,6 +325,80 @@ background-color: {rgb_to_hex((74, 20, 120))};
         self._update_count_label(len(self.services))
 
         self.setLayout(main_layout)
+
+    def _return_to_services(self):
+        if self.is_near_view and self.near_view_widget:
+            # Удаляем временный виджет
+            self.near_view_widget.setParent(None)
+            self.near_view_widget.deleteLater()
+            self.near_view_widget = None
+
+            # Восстанавливаем оригинальный UI
+            self.control_layout_widget.setVisible(True)
+            self.scroll_area.setVisible(True)
+            self.footer.setVisible(True)
+
+            # Кнопки админа — показываем, если is_admin
+            self.add_service_btn.setVisible(self.is_admin)
+            self.near_service_btn.setVisible(self.is_admin)
+
+            self.is_near_view = False
+
+    def _build_near_view(self) -> QWidget:
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        layout.setContentsMargins(30, 30, 30, 30)
+        layout.setSpacing(20)
+
+        # Заголовок
+        title = QLabel("📅 Ближайшие записи")
+        title.setFont(QFont(FONT_FAMILY, 18, QFont.Weight.Bold))
+        layout.addWidget(title)
+
+        # Здесь — ваша логика загрузки ближайших записей (например, SELECT FROM Booking WHERE ...)
+        # Для примера — 3 фейковые записи:
+        records = [
+            {"user": "Анна", "service": "Маникюр", "time": "15 дек, 14:30"},
+            {"user": "Мария", "service": "Стрижка", "time": "15 дек, 16:00"},
+            {"user": "Елена", "service": "Окрашивание", "time": "16 дек, 10:15"},
+        ]
+
+        for rec in records:
+            card = QFrame()
+            card.setStyleSheet("background: white; border-radius: 10px; padding: 12px;")
+            card_layout = QHBoxLayout()
+
+            name_label = QLabel(f"<b>{rec['user']}</b>")
+            service_label = QLabel(rec["service"])
+            time_label = QLabel(f"<i>{rec['time']}</i>")
+
+            card_layout.addWidget(name_label)
+            card_layout.addWidget(service_label)
+            card_layout.addStretch()
+            card_layout.addWidget(time_label)
+            card.setLayout(card_layout)
+            layout.addWidget(card)
+
+        # Кнопка "Назад"
+        back_btn = QPushButton("← Назад к услугам")
+        back_btn.setFont(QFont(FONT_FAMILY, 12))
+        back_btn.setFixedHeight(40)
+        back_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {rgb_to_hex(COLOR_BUTTON_ADMIN)};
+                color: white;
+                border: none;
+                border-radius: 10px;
+            }}
+            QPushButton:hover {{
+                background-color: {rgb_to_hex((19, 94, 167))};
+            }}
+        """)
+        back_btn.clicked.connect(self._return_to_services)
+        layout.addWidget(back_btn)
+        layout.addStretch()
+
+        return widget
 
     def show_login(self):
         dialog = LoginDialog(self)
@@ -327,14 +426,124 @@ background-color: {rgb_to_hex((74, 20, 120))};
     
     def on_edit(self, service_id: int):
         print(f"[Admin] Редактирование услуги ID: {service_id}")
+        arg = f"SELECT * FROM Service WHERE id = {service_id}"
+        res = db.fetch_one(arg)  # предположим, возвращает list[dict] или None
+
+        if not res:
+            QMessageBox.warning(self, "Ошибка", f"Услуга с ID {service_id} не найдена.")
+            return
+
+        service_data = res[0]  # берем первую запись
+
+        dialog = EditServiceDialog(service_data, parent=self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            updated_data = dialog.get_data()
+            # Пример UPDATE-запроса (рекомендуется использовать параметризованные запросы!)
+            try:
+                query = """
+                    UPDATE Service
+                    SET Title = %s, Cost = %s, DurationInSeconds = %s,
+                        Discount = %s, MainImagePath = %s
+                    WHERE ID = %s
+                """
+                params = (
+                    updated_data['Title'],
+                    updated_data['Cost'],
+                    updated_data['DurationInSeconds'],
+                    updated_data['Discount'],
+                    updated_data['MainImagePath'],
+                    updated_data['ID']
+                )
+                db.execute(query, params)  # предполагаем, что у вас есть execute с параметрами
+                QMessageBox.information(self, "Успех", "Услуга успешно обновлена.")
+                
+            except Exception as e:
+                QMessageBox.critical(self, "Ошибка", f"Не удалось сохранить изменения:\n{e}")
+        else:
+            print("[Admin] Редактирование отменено.")
+
+    def on_book(self, service_id: int):
+        print(f"[Admin] Запись на услугу с ID: {service_id}")
+
+        # ⚠️ Подстановка service_id в строку — только если вы 100% уверены, что service_id — int
+        # (иначе — риск SQL-инъекции; но при вызове из UI, где service_id берётся из ID записи — безопасно)
+        res = db.fetch_one(f"SELECT * FROM Service WHERE ID = {int(service_id)}")
+        if not res:
+            QMessageBox.warning(self, "Ошибка", f"Услуга ID {service_id} не найдена.")
+            return
+        service_data = res[0]  # ← fetch_one возвращает список, берём первый элемент
+
+        # Загрузка клиентов
+        client_res = db.fetch_one("SELECT ID, LastName, FirstName, Patronymic FROM Client ORDER BY LastName, FirstName")
+        clients = []
+        for row in client_res:  # client_res — список, даже если 0 строк
+            fio = f"{row['LastName']} {row['FirstName']} {row['Patronymic'] or ''}".strip()
+            clients.append((row['ID'], fio))
+
+        if not clients:
+            QMessageBox.warning(self, "Внимание", "Нет доступных клиентов.")
+            return
+
+        dialog = BookServiceDialog(service_data, clients, parent=self)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            try:
+                data = dialog.get_data()
+                # Экранируем апострофы в дате (на всякий случай), хотя формат yyyy-MM-dd HH:MM:SS безопасен
+                start_escaped = data['StartTime'].replace("'", "''")
+                
+                query = (
+                    f"INSERT INTO ClientService (ClientID, ServiceID, StartTime) "
+                    f"VALUES ({int(data['ClientID'])}, {int(data['ServiceID'])}, '{start_escaped}')"
+                )
+                success = db.execute(query)
+                if success:
+                    QMessageBox.information(self, "Успех", "Клиент записан.")
+                else:
+                    QMessageBox.critical(self, "Ошибка", "Не удалось сохранить запись.")
+            except Exception as e:
+                QMessageBox.critical(self, "Ошибка", f"Сбой: {e}")
+        else:
+            print("[Admin] Запись отменена.")
 
     def on_delete(self, service_id: int):
         print(f"[Admin] Удаление услуги ID: {service_id}")
-        # res = db.delete_service(service_id)
-        # print(res)
+
+        success, message = db.delete_service(service_id)  # ← предполагаем, что возвращает (bool, str)
+
+        if success:
+            QMessageBox.information(
+                self,
+                "✅ Удалено",
+                f"Услуга с ID {service_id} успешно удалена."
+            )
+            print(f"[Admin] Услуга ID {service_id} удалена.")
+            self.update_screen()
+        else:
+            QMessageBox.warning(
+                self,
+                "⛔ Удаление невозможно",
+                f"Не удалось удалить услугу:\n{message}"
+            )
+            # ❗ Не вызываем self.update_screen(), т.к. данные не изменились
+            print(f"[Admin] Удаление отклонено: {message}")
 
     def on_nearly_service(self, service_id: int):
         print(f"[Admin] Ближайшие записи")
+        if not self.is_near_view:
+            # Скрываем текущие виджеты: control panel, scroll area, footer, доп.кнопки
+            self.control_layout_widget.setVisible(False)  # см. ниже: вынесем control_layout в widget
+            self.scroll_area.setVisible(False)
+            self.footer.setVisible(False)
+            self.add_service_btn.setVisible(False)
+            self.near_service_btn.setVisible(False)
+
+            # Создаём новый UI для "Ближайших записей"
+            self.near_view_widget = self._build_near_view()
+            self.layout().addWidget(self.near_view_widget)
+            self.near_view_widget.setVisible(True)
+
+            self.is_near_view = True
+
 
     def on_add_service(self):
         print(f"[Admin] Добавить услугу")
@@ -435,7 +644,7 @@ background-color: {rgb_to_hex((74, 20, 120))};
                     # Генерируем уникальное имя файла или используем title
                     from pathlib import Path
                     filename = f"{Path(title).stem}_{hash(image_path) % 10000}.jpg"
-                    dest_dir = "assets/services"
+                    dest_dir = "assets/service_photo"
                     os.makedirs(dest_dir, exist_ok=True)
                     dest_path = os.path.join(dest_dir, filename)
 
@@ -462,6 +671,7 @@ background-color: {rgb_to_hex((74, 20, 120))};
                     QMessageBox.information(dialog, "Успех", f"Услуга '{title}' добавлена")
                     dialog.accept()
                     self.services = db.fetch_all("Service")
+                    self.update_screen() 
                 else:
                     QMessageBox.critical(dialog, "Ошибка", "Не удалось добавить услугу в базу данных.")
             except Exception as e:
@@ -509,6 +719,17 @@ background-color: {rgb_to_hex((74, 20, 120))};
         self._update_count_label(len(searched))
 
 
+    def update_screen(self):
+        # Загрузка данных
+        self.services = db.fetch_all("SELECT * FROM Service")  # ← важно: fetch_all, а не "Service"
+        if not self.services:
+            self.services = []
+
+        count_res = db.fetch_one("SELECT COUNT(*) AS cnt FROM Service")
+        self.total_service_count = count_res[0]["cnt"] if count_res else 0
+
+        self.apply_all_filters()
+
     def _update_service_cards(self, services_list):
         """Обновляет порядок карточек в layout'е на основе нового списка."""
         container_layout = self.findChild(QScrollArea).widget().layout()
@@ -525,7 +746,7 @@ background-color: {rgb_to_hex((74, 20, 120))};
 
         # Создаём карточки заново в новом порядке
         for srv in services_list:
-            discount_factor = float(srv.get('Discount', 1.0))
+            discount_factor = float(srv.get('Discount') or 1.0)
             discount_percent = int((1 - discount_factor) * 100) if discount_factor < 1.0 else 0
             base_price = float(srv['Cost'])
             duration_min = srv['DurationInSeconds'] // 60 if srv.get('DurationInSeconds') else 0
@@ -543,6 +764,7 @@ background-color: {rgb_to_hex((74, 20, 120))};
                 is_admin_mode=self.is_admin
             )
             card.edit_requested.connect(self.on_edit)
+            card.book_requested.connect(self.on_book)
             card.delete_requested.connect(self.on_delete)
             container_layout.addWidget(card)
             self.service_cards.append(card)
