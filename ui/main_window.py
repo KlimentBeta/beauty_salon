@@ -564,7 +564,7 @@ class MainWindow(QWidget):
             self.add_service_btn.setVisible(False)
             self.near_service_btn.setVisible(False)
 
-            self.near_view_widget = NearRecordsView()
+            self.near_view_widget = NearRecordsView(db)
             self.near_view_widget.back_requested.connect(self._return_to_services)
             self.layout().addWidget(self.near_view_widget)
             self.is_near_view = True
